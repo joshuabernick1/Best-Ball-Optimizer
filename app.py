@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 
 st.title("Best Ball Optimizer")
+page = st.sidebar.radio(
+    "Choose Page",
+    ["Draft Optimizer", "Simulation Stats"]
+)
 
 player_col = "Player"
 pos_col = "Position"
@@ -132,121 +136,192 @@ if "POS Rank" in df.columns:
 
 st.success(f"Loaded {len(df)} players from {sheet}!")
 
-st.subheader("Player Data")
-player_start_col = df.columns.get_loc("Player")
-st.dataframe(df.iloc[:, player_start_col:])
 
-st.subheader("Draft Settings")
-st.write("Optional: choose a required number for any position. Leave blank for no limit.")
+if page == "Draft Optimizer":
 
-col1, col2, col3, col4 = st.columns(4)
+    st.subheader("Player Data")
+    player_start_col = df.columns.get_loc("Player")
+    st.dataframe(df.iloc[:, player_start_col:])
 
-with col1:
-    qb_limit = st.number_input("QB", min_value=0, max_value=10, value=None, placeholder="Any")
+    st.subheader("Draft Settings")
+    st.write("Optional: choose a required number for any position. Leave blank for no limit.")
 
-with col2:
-    rb_limit = st.number_input("RB", min_value=0, max_value=15, value=None, placeholder="Any")
+    col1, col2, col3, col4 = st.columns(4)
 
-with col3:
-    wr_limit = st.number_input("WR", min_value=0, max_value=15, value=None, placeholder="Any")
+    with col1:
+        qb_limit = st.number_input("QB", min_value=0, max_value=10, value=None, placeholder="Any")
 
-with col4:
-    te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
+    with col2:
+        rb_limit = st.number_input("RB", min_value=0, max_value=15, value=None, placeholder="Any")
 
-position_limits = {
-    "QB": qb_limit if qb_limit is not None else 99,
-    "RB": rb_limit if rb_limit is not None else 99,
-    "WR": wr_limit if wr_limit is not None else 99,
-    "TE": te_limit if te_limit is not None else 99
-}
+    with col3:
+        wr_limit = st.number_input("WR", min_value=0, max_value=15, value=None, placeholder="Any")
 
-random_pool = st.slider(
-    "Random Player Pool",
-    min_value=1,
-    max_value=20,
-    value=10
-)
+    with col4:
+        te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
 
-st.subheader("Locked Picks")
+    position_limits = {
+        "QB": qb_limit if qb_limit is not None else 99,
+        "RB": rb_limit if rb_limit is not None else 99,
+        "WR": wr_limit if wr_limit is not None else 99,
+        "TE": te_limit if te_limit is not None else 99
+    }
 
-if "locked_picks" not in st.session_state:
-    st.session_state.locked_picks = {}
+    random_pool = st.slider(
+        "Random Player Pool",
+        min_value=1,
+        max_value=20,
+        value=10
+    )
 
-selected_round = st.selectbox(
-    "Round",
-    list(range(1, 21))
-)
+    st.subheader("Locked Picks")
 
-selected_player = st.selectbox(
-    "Player",
-    [""] + sorted(df[player_col].tolist())
-)
-
-if st.button("Add Locked Pick"):
-    if selected_player:
-        st.session_state.locked_picks[selected_round] = selected_player
-
-locked_picks = st.session_state.locked_picks
-
-if locked_picks:
-    locked_df = pd.DataFrame([
-        {"Round": r, "Player": p}
-        for r, p in sorted(locked_picks.items())
-    ])
-
-    st.dataframe(locked_df, hide_index=True)
-
-    if st.button("Clear Locked Picks"):
+    if "locked_picks" not in st.session_state:
         st.session_state.locked_picks = {}
-        st.rerun()
 
-if st.button("Run Test Draft"):
-    best_result = None
-    best_score = 0
-    best_weekly_breakdown = None
+    selected_round = st.selectbox("Round", list(range(1, 21)))
 
-    attempts = 0
-    max_attempts = 500
+    selected_player = st.selectbox(
+        "Player",
+        [""] + sorted(df[player_col].tolist())
+    )
 
-    while best_score < 1800 and attempts < max_attempts:
-        draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
-        roster = df[df[player_col].isin(draft_result["Player"])]
+    if st.button("Add Locked Pick"):
+        if selected_player:
+            st.session_state.locked_picks[selected_round] = selected_player
 
-        score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
+    locked_picks = st.session_state.locked_picks
 
-        if score > best_score:
-            best_score = score
-            best_result = draft_result
-            best_weekly_breakdown = weekly_breakdown
+    if locked_picks:
+        locked_df = pd.DataFrame([
+            {"Round": r, "Player": p}
+            for r, p in sorted(locked_picks.items())
+        ])
 
-        attempts += 1
+        st.dataframe(locked_df, hide_index=True)
 
-    st.subheader("Test Draft")
+        if st.button("Clear Locked Picks"):
+            st.session_state.locked_picks = {}
+            st.rerun()
 
-    left_col, right_col = st.columns([3, 1])
+    if st.button("Run Test Draft"):
+        best_result = None
+        best_score = 0
+        best_weekly_breakdown = None
 
-    with left_col:
-        st.dataframe(best_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
+        attempts = 0
+        max_attempts = 500
 
-    with right_col:
-        st.subheader("Team Count")
-        position_count = best_result["Position"].value_counts().reindex(
-            ["QB", "RB", "WR", "TE"],
-            fill_value=0
+        while best_score < 1800 and attempts < max_attempts:
+            draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
+            roster = df[df[player_col].isin(draft_result["Player"])]
+
+            score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
+
+            if score > best_score:
+                best_score = score
+                best_result = draft_result
+                best_weekly_breakdown = weekly_breakdown
+
+            attempts += 1
+
+        st.subheader("Test Draft")
+
+        left_col, right_col = st.columns([3, 1])
+
+        with left_col:
+            st.dataframe(best_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
+
+        with right_col:
+            st.subheader("Team Count")
+            position_count = best_result["Position"].value_counts().reindex(
+                ["QB", "RB", "WR", "TE"],
+                fill_value=0
+            )
+
+            st.dataframe(
+                position_count.reset_index().rename(
+                    columns={"index": "Pos", "Position": "#"}
+                ),
+                hide_index=True
+            )
+
+        st.subheader("Draft Score")
+        st.write(round(best_score, 2))
+
+        if best_score < 1800:
+            st.warning("No draft over 1800 was found. Showing the best result found.")
+
+        st.subheader("Weekly Lineups")
+        st.dataframe(best_weekly_breakdown, hide_index=True)
+
+
+if page == "Simulation Stats":
+
+    st.header("Simulation Stats")
+
+    sim_count = st.number_input(
+        "How many simulations?",
+        min_value=10,
+        max_value=10000,
+        value=1000,
+        step=100
+    )
+
+    random_pool_stats = st.slider(
+        "Random Player Pool",
+        min_value=1,
+        max_value=20,
+        value=10,
+        key="stats_random_pool"
+    )
+
+    if st.button("Run Simulation Stats"):
+        all_drafts = []
+        progress = st.progress(0)
+
+        for i in range(sim_count):
+            draft_result = run_simple_draft(
+                df,
+                random_pool_stats,
+                {},
+                {"QB": 99, "RB": 99, "WR": 99, "TE": 99}
+            )
+
+            draft_result["Simulation"] = i + 1
+            all_drafts.append(draft_result)
+
+            progress.progress((i + 1) / sim_count)
+
+        results = pd.concat(all_drafts)
+
+        position_by_round = (
+            results.groupby(["Round", "Position"])
+            .size()
+            .reset_index(name="Count")
         )
 
-        st.dataframe(
-            position_count.reset_index().rename(
-                columns={"index": "Pos", "Position": "#"}
-            ),
-            hide_index=True
+        position_by_round["Percent"] = (
+            position_by_round["Count"] / sim_count * 100
+        ).round(1)
+
+        pivot_table = position_by_round.pivot(
+            index="Round",
+            columns="Position",
+            values="Percent"
+        ).fillna(0)
+
+        st.subheader("Position Drafted by Round (%)")
+        st.dataframe(pivot_table)
+
+        st.subheader("Raw Simulation Results")
+        st.dataframe(results)
+
+        csv = results.to_csv(index=False).encode("utf-8")
+
+        st.download_button(
+            "Download Simulation Results",
+            data=csv,
+            file_name="simulation_results.csv",
+            mime="text/csv"
         )
-
-    st.subheader("Draft Score")
-    st.write(round(best_score, 2))
-
-    if best_score < 1800:
-        st.warning("No draft over 1800 was found. Showing the best result found.")
-
-    st.subheader("Weekly Lineups")
-    st.dataframe(best_weekly_breakdown, hide_index=True)
