@@ -8,23 +8,30 @@ pos_col = "Position"
 adp_col = "ADP"
 
 
-def run_simple_draft(df, random_pool, locked_picks):
+def run_simple_draft(df, random_pool, locked_picks, position_limits):
     drafted = []
+
     df = df.copy()
     df[adp_col] = pd.to_numeric(df[adp_col], errors="coerce")
 
     for round_num in range(1, 21):
+        drafted_counts = pd.Series([p["Position"] for p in drafted]).value_counts().to_dict()
+
         if round_num in locked_picks:
             locked_name = locked_picks[round_num]
             locked_player = df[df[player_col].str.upper() == locked_name.upper()]
 
             if not locked_player.empty:
                 player = locked_player.iloc[0]
-                drafted.append({
-                    "Round": round_num,
-                    "Player": player[player_col],
-                    "ADP": player[adp_col]
-                })
+                player_pos = player[pos_col]
+
+                if drafted_counts.get(player_pos, 0) < position_limits.get(player_pos, 99):
+                    drafted.append({
+                        "Round": round_num,
+                        "Player": player[player_col],
+                        "Position": player_pos,
+                        "ADP": player[adp_col]
+                    })
                 continue
 
         low_adp = ((round_num - 1) * 12) + 1
@@ -38,6 +45,12 @@ def run_simple_draft(df, random_pool, locked_picks):
             (~df[player_col].isin(drafted_names))
         ]
 
+        candidates = candidates[
+            candidates[pos_col].apply(
+                lambda p: drafted_counts.get(p, 0) < position_limits.get(p, 99)
+            )
+        ]
+
         if candidates.empty:
             continue
 
@@ -48,6 +61,7 @@ def run_simple_draft(df, random_pool, locked_picks):
         drafted.append({
             "Round": round_num,
             "Player": pick[player_col],
+            "Position": pick[pos_col],
             "ADP": pick[adp_col]
         })
 
@@ -123,6 +137,28 @@ player_start_col = df.columns.get_loc("Player")
 st.dataframe(df.iloc[:, player_start_col:])
 
 st.subheader("Draft Settings")
+st.write("Choose how many players to draft by position:")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    qb_limit = st.number_input("QB", min_value=0, max_value=10, value=2)
+
+with col2:
+    rb_limit = st.number_input("RB", min_value=0, max_value=15, value=6)
+
+with col3:
+    wr_limit = st.number_input("WR", min_value=0, max_value=15, value=7)
+
+with col4:
+    te_limit = st.number_input("TE", min_value=0, max_value=10, value=3)
+
+position_limits = {
+    "QB": qb_limit,
+    "RB": rb_limit,
+    "WR": wr_limit,
+    "TE": te_limit
+}
 
 random_pool = st.slider(
     "Random Player Pool",
@@ -165,14 +201,14 @@ if locked_picks:
         st.rerun()
 
 if st.button("Run Test Draft"):
-    draft_result = run_simple_draft(df, random_pool, locked_picks)
+    draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
 
     roster = df[df[player_col].isin(draft_result["Player"])]
 
     score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
 
     st.subheader("Test Draft")
-    st.dataframe(draft_result[["Round", "Player", "ADP"]], hide_index=True)
+    st.dataframe(draft_result[["Round", "Player", "Position" "ADP"]], hide_index=True)
 
     st.subheader("Draft Score")
     st.write(round(score, 2))
