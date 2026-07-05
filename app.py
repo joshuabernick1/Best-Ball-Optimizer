@@ -208,7 +208,7 @@ if st.button("Run Test Draft"):
     score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
 
     st.subheader("Test Draft")
-    st.dataframe(draft_result[["Round", "Player", "Position" "ADP"]], hide_index=True)
+    st.dataframe(draft_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
 
     st.subheader("Draft Score")
     st.write(round(score, 2))
