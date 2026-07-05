@@ -91,9 +91,16 @@ def calculate_best_ball_score(roster, week_cols):
 
 excel_file = pd.ExcelFile("Best Ball Optimizer.xlsx")
 
+hidden_sheets = ["Sheet2", "26 WR"]
+
+visible_sheets = [
+    s for s in excel_file.sheet_names
+    if s not in hidden_sheets
+]
+
 sheet = st.selectbox(
     "Choose a draft format",
-    excel_file.sheet_names
+    visible_sheets
 )
 
 df = pd.read_excel("Best Ball Optimizer.xlsx", sheet_name=sheet)
