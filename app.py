@@ -201,17 +201,52 @@ if locked_picks:
         st.rerun()
 
 if st.button("Run Test Draft"):
-    draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
+    best_result = None
+    best_score = 0
+    best_weekly_breakdown = None
 
-    roster = df[df[player_col].isin(draft_result["Player"])]
+    attempts = 0
+    max_attempts = 500
 
-    score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
+    while best_score < 1800 and attempts < max_attempts:
+        draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
+        roster = df[df[player_col].isin(draft_result["Player"])]
+
+        score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
+
+        if score > best_score:
+            best_score = score
+            best_result = draft_result
+            best_weekly_breakdown = weekly_breakdown
+
+        attempts += 1
 
     st.subheader("Test Draft")
-    st.dataframe(draft_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
+
+    left_col, right_col = st.columns([3, 1])
+
+    with left_col:
+        st.dataframe(best_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
+
+    with right_col:
+        st.subheader("Team Count")
+        position_count = best_result["Position"].value_counts().reindex(
+            ["QB", "RB", "WR", "TE"],
+            fill_value=0
+        )
+
+        st.dataframe(
+            position_count.reset_index().rename(
+                columns={"index": "Pos", "Position": "#"}
+            ),
+            hide_index=True
+        )
 
     st.subheader("Draft Score")
-    st.write(round(score, 2))
+    st.write(round(best_score, 2))
+
+    if best_score < 1800:
+        st.warning("No draft over 1800 was found. Showing the best result found.")
 
     st.subheader("Weekly Lineups")
-    st.dataframe(weekly_breakdown, hide_index=True)
+    st.dataframe(best_weekly_breakdown, hide_index=True)
