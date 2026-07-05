@@ -137,27 +137,27 @@ player_start_col = df.columns.get_loc("Player")
 st.dataframe(df.iloc[:, player_start_col:])
 
 st.subheader("Draft Settings")
-st.write("Choose how many players to draft by position:")
+st.write("Optional: choose a required number for any position. Leave blank for no limit.")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    qb_limit = st.number_input("QB", min_value=0, max_value=10, value=2)
+    qb_limit = st.number_input("QB", min_value=0, max_value=10, value=None, placeholder="Any")
 
 with col2:
-    rb_limit = st.number_input("RB", min_value=0, max_value=15, value=6)
+    rb_limit = st.number_input("RB", min_value=0, max_value=15, value=None, placeholder="Any")
 
 with col3:
-    wr_limit = st.number_input("WR", min_value=0, max_value=15, value=7)
+    wr_limit = st.number_input("WR", min_value=0, max_value=15, value=None, placeholder="Any")
 
 with col4:
-    te_limit = st.number_input("TE", min_value=0, max_value=10, value=3)
+    te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
 
 position_limits = {
-    "QB": qb_limit,
-    "RB": rb_limit,
-    "WR": wr_limit,
-    "TE": te_limit
+    "QB": qb_limit if qb_limit is not None else 99,
+    "RB": rb_limit if rb_limit is not None else 99,
+    "WR": wr_limit if wr_limit is not None else 99,
+    "TE": te_limit if te_limit is not None else 99
 }
 
 random_pool = st.slider(
