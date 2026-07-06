@@ -18,9 +18,10 @@ def run_simple_draft(df, random_pool, locked_picks, position_minimums):
     df = df.copy()
     df[adp_col] = pd.to_numeric(df[adp_col], errors="coerce")
 
-    for round_num in range(1, 21):
+       for round_num in range(1, 21):
         drafted_counts = pd.Series([p["Position"] for p in drafted]).value_counts().to_dict()
-        picks_left = 21 - round_num
+
+        picks_left = 21 - round_num  # includes current pick
 
         needed_positions = {
             pos: max(0, minimum - drafted_counts.get(pos, 0))
@@ -31,12 +32,11 @@ def run_simple_draft(df, random_pool, locked_picks, position_minimums):
 
         force_positions = []
 
-        if total_needed > picks_left:
+        if total_needed >= picks_left:
             force_positions = [
                 pos for pos, needed in needed_positions.items()
                 if needed > 0
             ]
-
         if round_num in locked_picks:
             locked_name = locked_picks[round_num]
             locked_player = df[df[player_col].str.upper() == locked_name.upper()]
