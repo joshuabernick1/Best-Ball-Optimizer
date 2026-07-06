@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 
 st.title("Best Ball Optimizer")
+
 page = st.sidebar.radio(
     "Choose Page",
     ["Draft Optimizer", "Simulation Stats"]
@@ -12,45 +13,24 @@ pos_col = "Position"
 adp_col = "ADP"
 
 
-def run_simple_draft(df, random_pool, locked_picks, position_minimums):
+def run_simple_draft(df, random_pool, locked_picks):
     drafted = []
-
     df = df.copy()
     df[adp_col] = pd.to_numeric(df[adp_col], errors="coerce")
 
-       for round_num in range(1, 21):
-        drafted_counts = pd.Series([p["Position"] for p in drafted]).value_counts().to_dict()
-
-        picks_left = 21 - round_num  # includes current pick
-
-        needed_positions = {
-            pos: max(0, minimum - drafted_counts.get(pos, 0))
-            for pos, minimum in position_minimums.items()
-        }
-
-        total_needed = sum(needed_positions.values())
-
-        force_positions = []
-
-        if total_needed >= picks_left:
-            force_positions = [
-                pos for pos, needed in needed_positions.items()
-                if needed > 0
-            ]
+    for round_num in range(1, 21):
         if round_num in locked_picks:
             locked_name = locked_picks[round_num]
             locked_player = df[df[player_col].str.upper() == locked_name.upper()]
 
             if not locked_player.empty:
                 player = locked_player.iloc[0]
-
                 drafted.append({
                     "Round": round_num,
                     "Player": player[player_col],
                     "Position": player[pos_col],
                     "ADP": player[adp_col]
                 })
-
                 continue
 
         low_adp = ((round_num - 1) * 12) + 1
@@ -64,16 +44,8 @@ def run_simple_draft(df, random_pool, locked_picks, position_minimums):
             (~df[player_col].isin(drafted_names))
         ]
 
-        if force_positions:
-            candidates = candidates[candidates[pos_col].isin(force_positions)]
-
         if candidates.empty:
-            candidates = df[
-                (~df[player_col].isin(drafted_names))
-            ]
-
-            if force_positions:
-                candidates = candidates[candidates[pos_col].isin(force_positions)]
+            candidates = df[~df[player_col].isin(drafted_names)]
 
         if candidates.empty:
             continue
@@ -90,6 +62,16 @@ def run_simple_draft(df, random_pool, locked_picks, position_minimums):
         })
 
     return pd.DataFrame(drafted)
+
+
+def meets_minimums(draft_result, position_minimums):
+    counts = draft_result["Position"].value_counts().to_dict()
+
+    for pos, minimum in position_minimums.items():
+        if counts.get(pos, 0) < minimum:
+            return False
+
+    return True
 
 
 def calculate_best_ball_score(roster, week_cols):
@@ -164,27 +146,27 @@ if page == "Draft Optimizer":
     st.dataframe(df.iloc[:, player_start_col:])
 
     st.subheader("Draft Settings")
-    st.write("Optional: choose a required number for any position. Leave blank for no limit.")
+    st.write("Optional: choose minimums by position. Leave blank for no minimum.")
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        qb_limit = st.number_input("QB", min_value=0, max_value=10, value=None, placeholder="Any")
+        qb_min = st.number_input("QB Minimum", min_value=0, max_value=10, value=None, placeholder="Any")
 
     with col2:
-        rb_limit = st.number_input("RB", min_value=0, max_value=15, value=None, placeholder="Any")
+        rb_min = st.number_input("RB Minimum", min_value=0, max_value=15, value=None, placeholder="Any")
 
     with col3:
-        wr_limit = st.number_input("WR", min_value=0, max_value=15, value=None, placeholder="Any")
+        wr_min = st.number_input("WR Minimum", min_value=0, max_value=15, value=None, placeholder="Any")
 
     with col4:
-        te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
+        te_min = st.number_input("TE Minimum", min_value=0, max_value=10, value=None, placeholder="Any")
 
     position_minimums = {
-        "QB": qb_limit if qb_limit is not None else 0,
-        "RB": rb_limit if rb_limit is not None else 0,
-        "WR": wr_limit if wr_limit is not None else 0,
-        "TE": te_limit if te_limit is not None else 0
+        "QB": qb_min if qb_min is not None else 0,
+        "RB": rb_min if rb_min is not None else 0,
+        "WR": wr_min if wr_min is not None else 0,
+        "TE": te_min if te_min is not None else 0
     }
 
     random_pool = st.slider(
@@ -230,12 +212,16 @@ if page == "Draft Optimizer":
         best_weekly_breakdown = None
 
         attempts = 0
-        max_attempts = 500
+        max_attempts = 1000
 
-        while best_score < 1800 and attempts < max_attempts:
-            draft_result = run_simple_draft(df, random_pool, locked_picks, position_minimums)
+        while attempts < max_attempts:
+            draft_result = run_simple_draft(df, random_pool, locked_picks)
+
+            if not meets_minimums(draft_result, position_minimums):
+                attempts += 1
+                continue
+
             roster = df[df[player_col].isin(draft_result["Player"])]
-
             score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
 
             if score > best_score:
@@ -243,37 +229,43 @@ if page == "Draft Optimizer":
                 best_result = draft_result
                 best_weekly_breakdown = weekly_breakdown
 
+            if best_score >= 1800:
+                break
+
             attempts += 1
 
-        st.subheader("Test Draft")
+        if best_result is None:
+            st.error("No draft found that meets the position minimums. Try lowering the minimums.")
+        else:
+            st.subheader("Test Draft")
 
-        left_col, right_col = st.columns([3, 1])
+            left_col, right_col = st.columns([3, 1])
 
-        with left_col:
-            st.dataframe(best_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
+            with left_col:
+                st.dataframe(best_result[["Round", "Player", "Position", "ADP"]], hide_index=True)
 
-        with right_col:
-            st.subheader("Team Count")
-            position_count = best_result["Position"].value_counts().reindex(
-                ["QB", "RB", "WR", "TE"],
-                fill_value=0
-            )
+            with right_col:
+                st.subheader("Team Count")
+                position_count = best_result["Position"].value_counts().reindex(
+                    ["QB", "RB", "WR", "TE"],
+                    fill_value=0
+                )
 
-            st.dataframe(
-                position_count.reset_index().rename(
-                    columns={"index": "Pos", "Position": "#"}
-                ),
-                hide_index=True
-            )
+                st.dataframe(
+                    position_count.reset_index().rename(
+                        columns={"index": "Pos", "Position": "#"}
+                    ),
+                    hide_index=True
+                )
 
-        st.subheader("Draft Score")
-        st.write(round(best_score, 2))
+            st.subheader("Draft Score")
+            st.write(round(best_score, 2))
 
-        if best_score < 1800:
-            st.warning("No draft over 1800 was found. Showing the best result found.")
+            if best_score < 1800:
+                st.warning("No draft over 1800 was found. Showing the best valid result found.")
 
-        st.subheader("Weekly Lineups")
-        st.dataframe(best_weekly_breakdown, hide_index=True)
+            st.subheader("Weekly Lineups")
+            st.dataframe(best_weekly_breakdown, hide_index=True)
 
 
 if page == "Simulation Stats":
@@ -301,13 +293,7 @@ if page == "Simulation Stats":
         progress = st.progress(0)
 
         for i in range(sim_count):
-            draft_result = run_simple_draft(
-                df,
-                random_pool_stats,
-                {},
-                {"QB": 0, "RB": 0, "WR": 0, "TE": 0}
-            )
-
+            draft_result = run_simple_draft(df, random_pool_stats)
             draft_result["Simulation"] = i + 1
             all_drafts.append(draft_result)
 
