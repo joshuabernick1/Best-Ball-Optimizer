@@ -136,14 +136,14 @@ if "POS Rank" in df.columns:
     df["POS Rank"] = pd.to_numeric(df["POS Rank"], errors="coerce")
     df["Label"] = df[pos_col] + df["POS Rank"].fillna(0).astype(int).astype(str)
 
-st.success(f"Loaded {len(df)} players from {sheet}!")
-
+#st.success(f"Loaded {len(df)} players from {sheet}!")
+st.write(f"**Draft Format:** {sheet}")
 
 if page == "Draft Optimizer":
 
-    st.subheader("Player Data")
-    player_start_col = df.columns.get_loc("Player")
-    st.dataframe(df.iloc[:, player_start_col:])
+    #st.subheader("Player Data")
+    #player_start_col = df.columns.get_loc("Player")
+    #st.dataframe(df.iloc[:, player_start_col:])
 
     st.subheader("Draft Settings")
     st.write("Optional: choose minimums by position. Leave blank for no minimum.")
