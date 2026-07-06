@@ -175,7 +175,18 @@ if page == "Draft Optimizer":
         max_value=20,
         value=10
     )
+    st.info(
+    """
+        **Random Player Pool**
 
+            The optimizer first identifies the top available players by ADP for each pick. It then randomly selects one player from this pool.
+
+• **1** = Always drafts the highest ADP player available (least randomness)
+• **5** = Drafts from the top 5 available players
+• **10** = Drafts from the top 10 available players (recommended)
+• **20** = Allows much more variation and unique draft builds
+"""
+)
     st.subheader("Locked Picks")
 
     if "locked_picks" not in st.session_state:
