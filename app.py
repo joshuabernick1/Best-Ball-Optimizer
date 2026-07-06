@@ -12,7 +12,7 @@ pos_col = "Position"
 adp_col = "ADP"
 
 
-def run_simple_draft(df, random_pool, locked_picks, position_limits):
+def run_simple_draft(df, random_pool, locked_picks, position_minimums):
     drafted = []
 
     df = df.copy()
@@ -20,6 +20,22 @@ def run_simple_draft(df, random_pool, locked_picks, position_limits):
 
     for round_num in range(1, 21):
         drafted_counts = pd.Series([p["Position"] for p in drafted]).value_counts().to_dict()
+        picks_left = 21 - round_num
+
+        needed_positions = {
+            pos: max(0, minimum - drafted_counts.get(pos, 0))
+            for pos, minimum in position_minimums.items()
+        }
+
+        total_needed = sum(needed_positions.values())
+
+        force_positions = []
+
+        if total_needed > picks_left:
+            force_positions = [
+                pos for pos, needed in needed_positions.items()
+                if needed > 0
+            ]
 
         if round_num in locked_picks:
             locked_name = locked_picks[round_num]
@@ -27,15 +43,14 @@ def run_simple_draft(df, random_pool, locked_picks, position_limits):
 
             if not locked_player.empty:
                 player = locked_player.iloc[0]
-                player_pos = player[pos_col]
 
-                if drafted_counts.get(player_pos, 0) < position_limits.get(player_pos, 99):
-                    drafted.append({
-                        "Round": round_num,
-                        "Player": player[player_col],
-                        "Position": player_pos,
-                        "ADP": player[adp_col]
-                    })
+                drafted.append({
+                    "Round": round_num,
+                    "Player": player[player_col],
+                    "Position": player[pos_col],
+                    "ADP": player[adp_col]
+                })
+
                 continue
 
         low_adp = ((round_num - 1) * 12) + 1
@@ -49,11 +64,16 @@ def run_simple_draft(df, random_pool, locked_picks, position_limits):
             (~df[player_col].isin(drafted_names))
         ]
 
-        candidates = candidates[
-            candidates[pos_col].apply(
-                lambda p: drafted_counts.get(p, 0) < position_limits.get(p, 99)
-            )
-        ]
+        if force_positions:
+            candidates = candidates[candidates[pos_col].isin(force_positions)]
+
+        if candidates.empty:
+            candidates = df[
+                (~df[player_col].isin(drafted_names))
+            ]
+
+            if force_positions:
+                candidates = candidates[candidates[pos_col].isin(force_positions)]
 
         if candidates.empty:
             continue
@@ -160,7 +180,7 @@ if page == "Draft Optimizer":
     with col4:
         te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
 
-    position_limits = {
+    position_minimums = {
         "QB": qb_limit if qb_limit is not None else 99,
         "RB": rb_limit if rb_limit is not None else 99,
         "WR": wr_limit if wr_limit is not None else 99,
@@ -213,7 +233,7 @@ if page == "Draft Optimizer":
         max_attempts = 500
 
         while best_score < 1800 and attempts < max_attempts:
-            draft_result = run_simple_draft(df, random_pool, locked_picks, position_limits)
+            draft_result = run_simple_draft(df, random_pool, locked_picks, position_minimums)
             roster = df[df[player_col].isin(draft_result["Player"])]
 
             score, weekly_breakdown = calculate_best_ball_score(roster, week_cols)
