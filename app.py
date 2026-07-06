@@ -181,10 +181,10 @@ if page == "Draft Optimizer":
         te_limit = st.number_input("TE", min_value=0, max_value=10, value=None, placeholder="Any")
 
     position_minimums = {
-        "QB": qb_limit if qb_limit is not None else 99,
-        "RB": rb_limit if rb_limit is not None else 99,
-        "WR": wr_limit if wr_limit is not None else 99,
-        "TE": te_limit if te_limit is not None else 99
+        "QB": qb_limit if qb_limit is not None else 0,
+        "RB": rb_limit if rb_limit is not None else 0,
+        "WR": wr_limit if wr_limit is not None else 0,
+        "TE": te_limit if te_limit is not None else 0
     }
 
     random_pool = st.slider(
@@ -305,7 +305,7 @@ if page == "Simulation Stats":
                 df,
                 random_pool_stats,
                 {},
-                {"QB": 99, "RB": 99, "WR": 99, "TE": 99}
+                {"QB": 0, "RB": 0, "WR": 0, "TE": 0}
             )
 
             draft_result["Simulation"] = i + 1
