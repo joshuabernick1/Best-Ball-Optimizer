@@ -428,8 +428,44 @@ if page == "Simulation Stats":
         value=10,
         key="stats_random_pool"
     )
+    st.write("Minimums")
+col1, col2, col3, col4 = st.columns(4)
 
-    if st.button("Run Simulation Stats"):
+with col1:
+    stats_qb_min = st.number_input("QB Min", min_value=0, max_value=10, value=None, placeholder="Any", key="stats_qb_min")
+with col2:
+    stats_rb_min = st.number_input("RB Min", min_value=0, max_value=15, value=None, placeholder="Any", key="stats_rb_min")
+with col3:
+    stats_wr_min = st.number_input("WR Min", min_value=0, max_value=15, value=None, placeholder="Any", key="stats_wr_min")
+with col4:
+    stats_te_min = st.number_input("TE Min", min_value=0, max_value=10, value=None, placeholder="Any", key="stats_te_min")
+
+st.write("Maximums")
+col5, col6, col7, col8 = st.columns(4)
+
+with col5:
+    stats_qb_max = st.number_input("QB Max", min_value=0, max_value=10, value=None, placeholder="Any", key="stats_qb_max")
+with col6:
+    stats_rb_max = st.number_input("RB Max", min_value=0, max_value=15, value=None, placeholder="Any", key="stats_rb_max")
+with col7:
+    stats_wr_max = st.number_input("WR Max", min_value=0, max_value=15, value=None, placeholder="Any", key="stats_wr_max")
+with col8:
+    stats_te_max = st.number_input("TE Max", min_value=0, max_value=10, value=None, placeholder="Any", key="stats_te_max")
+
+stats_position_minimums = {
+    "QB": stats_qb_min if stats_qb_min is not None else 0,
+    "RB": stats_rb_min if stats_rb_min is not None else 0,
+    "WR": stats_wr_min if stats_wr_min is not None else 0,
+    "TE": stats_te_min if stats_te_min is not None else 0
+}
+
+stats_position_maximums = {
+    "QB": stats_qb_max,
+    "RB": stats_rb_max,
+    "WR": stats_wr_max,
+    "TE": stats_te_max
+}
+if st.button("Run Simulation Stats"):
         all_drafts = []
         score_rows = []
 
