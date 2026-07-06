@@ -474,7 +474,8 @@ if page == "Simulation Stats":
         min_value=10,
         max_value=10000,
         value=1000,
-        step=100
+        step=100,
+        key="sim_count_input"
     )
 
     st.subheader("Simulation Restrictions")
