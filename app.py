@@ -47,6 +47,9 @@ def run_simple_draft(df, random_pool, locked_picks):
         if candidates.empty:
             candidates = df[~df[player_col].isin(drafted_names)]
 
+        if candidates.empty:
+            continue
+
         candidates = candidates.sort_values(by=adp_col)
         top_players = candidates.head(min(random_pool, len(candidates)))
         pick = top_players.sample(1).iloc[0]
@@ -66,6 +69,16 @@ def meets_minimums(draft_result, position_minimums):
 
     for pos, minimum in position_minimums.items():
         if counts.get(pos, 0) < minimum:
+            return False
+
+    return True
+
+
+def meets_maximums(draft_result, position_maximums):
+    counts = draft_result["Position"].value_counts().to_dict()
+
+    for pos, maximum in position_maximums.items():
+        if maximum is not None and counts.get(pos, 0) > maximum:
             return False
 
     return True
@@ -223,27 +236,50 @@ st.caption(f"Draft Format: {sheet}")
 if page == "Draft Optimizer":
 
     st.subheader("Draft Settings")
-    st.write("Optional: choose minimums by position. Leave blank for no minimum.")
+    st.write("Optional: choose minimums and maximums by position. Leave blank for no restriction.")
 
+    st.write("Minimums")
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        qb_min = st.number_input("QB Minimum", min_value=0, max_value=10, value=None, placeholder="Any")
+        qb_min = st.number_input("QB Min", min_value=0, max_value=10, value=None, placeholder="Any")
 
     with col2:
-        rb_min = st.number_input("RB Minimum", min_value=0, max_value=15, value=None, placeholder="Any")
+        rb_min = st.number_input("RB Min", min_value=0, max_value=15, value=None, placeholder="Any")
 
     with col3:
-        wr_min = st.number_input("WR Minimum", min_value=0, max_value=15, value=None, placeholder="Any")
+        wr_min = st.number_input("WR Min", min_value=0, max_value=15, value=None, placeholder="Any")
 
     with col4:
-        te_min = st.number_input("TE Minimum", min_value=0, max_value=10, value=None, placeholder="Any")
+        te_min = st.number_input("TE Min", min_value=0, max_value=10, value=None, placeholder="Any")
+
+    st.write("Maximums")
+    col5, col6, col7, col8 = st.columns(4)
+
+    with col5:
+        qb_max = st.number_input("QB Max", min_value=0, max_value=10, value=None, placeholder="Any")
+
+    with col6:
+        rb_max = st.number_input("RB Max", min_value=0, max_value=15, value=None, placeholder="Any")
+
+    with col7:
+        wr_max = st.number_input("WR Max", min_value=0, max_value=15, value=None, placeholder="Any")
+
+    with col8:
+        te_max = st.number_input("TE Max", min_value=0, max_value=10, value=None, placeholder="Any")
 
     position_minimums = {
         "QB": qb_min if qb_min is not None else 0,
         "RB": rb_min if rb_min is not None else 0,
         "WR": wr_min if wr_min is not None else 0,
         "TE": te_min if te_min is not None else 0
+    }
+
+    position_maximums = {
+        "QB": qb_max,
+        "RB": rb_max,
+        "WR": wr_max,
+        "TE": te_max
     }
 
     random_pool = st.slider(
@@ -312,6 +348,10 @@ The optimizer first identifies the top available players by ADP for each pick. I
                 attempts += 1
                 continue
 
+            if not meets_maximums(draft_result, position_maximums):
+                attempts += 1
+                continue
+
             roster = df[df[player_col].isin(draft_result["Player"])]
 
             score, weekly_breakdown = calculate_best_ball_score(roster, week_cols, sheet)
@@ -329,7 +369,7 @@ The optimizer first identifies the top available players by ADP for each pick. I
             attempts += 1
 
         if best_result is None:
-            st.error("No draft found that meets the position minimums. Try lowering the minimums.")
+            st.error("No draft found that meets the position minimums/maximums. Try loosening the restrictions.")
         else:
             st.subheader("Test Draft")
 
