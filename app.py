@@ -178,7 +178,7 @@ def calculate_best_ball_score(roster, week_cols, sheet):
 
         weekly_results.append({
             "Week": week,
-            "Score": weekly_score,
+            "Score": round(weekly_score, 2),
             "Players": ", ".join(lineup[player_col].tolist())
         })
 
@@ -334,7 +334,7 @@ The optimizer first identifies the top available players by ADP for each pick. I
 
     if st.button("Run Test Draft"):
         best_result = None
-        best_score = 0
+        best_score = -1
         best_weekly_breakdown = None
         best_position_points = None
 
@@ -431,16 +431,78 @@ if page == "Simulation Stats":
 
     if st.button("Run Simulation Stats"):
         all_drafts = []
+        score_rows = []
+
+        best_score = -1
+        best_team = None
+        best_weekly_breakdown = None
+        best_position_points = None
+
         progress = st.progress(0)
 
         for i in range(sim_count):
             draft_result = run_simple_draft(df, random_pool_stats, {})
+            roster = df[df[player_col].isin(draft_result["Player"])]
+
+            score, weekly_breakdown = calculate_best_ball_score(roster, week_cols, sheet)
+            position_points = lineup_totals(roster, week_cols, sheet)
+
             draft_result["Simulation"] = i + 1
             all_drafts.append(draft_result)
+
+            score_rows.append({
+                "Simulation": i + 1,
+                "Score": round(score, 2)
+            })
+
+            if score > best_score:
+                best_score = score
+                best_team = draft_result.copy()
+                best_weekly_breakdown = weekly_breakdown
+                best_position_points = position_points
 
             progress.progress((i + 1) / sim_count)
 
         results = pd.concat(all_drafts)
+        scores_df = pd.DataFrame(score_rows)
+
+        st.subheader("Simulation Scores")
+        st.dataframe(scores_df, hide_index=True)
+
+        if best_team is not None:
+            st.subheader("Highest Scoring Team")
+            st.write(f"**Score:** {round(best_score, 2)}")
+
+            left_col, middle_col, right_col = st.columns([3, 1, 1])
+
+            with left_col:
+                st.dataframe(
+                    best_team[["Round", "Player", "Position", "ADP"]],
+                    hide_index=True
+                )
+
+            with middle_col:
+                st.subheader("Roster Count")
+                best_position_count = best_team["Position"].value_counts().reindex(
+                    ["QB", "RB", "WR", "TE"],
+                    fill_value=0
+                )
+
+                st.dataframe(
+                    best_position_count.reset_index().rename(
+                        columns={"index": "Pos", "Position": "#"}
+                    ),
+                    hide_index=True
+                )
+
+            with right_col:
+                st.subheader("Lineup Points")
+                st.dataframe(best_position_points, hide_index=True)
+
+            st.subheader("Best Team Weekly Lineups")
+            st.dataframe(best_weekly_breakdown, hide_index=True)
+        else:
+            st.warning("No highest scoring team was found.")
 
         position_by_round = (
             results.groupby(["Round", "Position"])
@@ -470,5 +532,14 @@ if page == "Simulation Stats":
             "Download Simulation Results",
             data=csv,
             file_name="simulation_results.csv",
+            mime="text/csv"
+        )
+
+        score_csv = scores_df.to_csv(index=False).encode("utf-8")
+
+        st.download_button(
+            "Download Simulation Scores",
+            data=score_csv,
+            file_name="simulation_scores.csv",
             mime="text/csv"
         )
